@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+
+
 
 void main() => runApp(const MyApp());
 
@@ -40,14 +44,15 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
           _buildSettingsItem(
-            title: 'Alterar a Senha',
+            title: 'Redefinir Senha',
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ChangePasswordScreen()),
+                MaterialPageRoute(builder: (context) => ResetPasswordScreen()), // Remova o `const` aqui
               );
             },
           ),
+
           _buildSettingsItem(
             title: 'Desenvolvedores',
             onTap: () {
@@ -81,6 +86,15 @@ class SettingsScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+              );
+            },
+          ),
+          _buildSettingsItem(
+            title: 'Deletar Conta',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const DeleteAccountScreen()),
               );
             },
           ),
@@ -129,7 +143,7 @@ class AccountInfoScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Informações da Conta'),
         centerTitle: true,
-        flexibleSpace: Center(
+        flexibleSpace: const Center(
           child: Padding(
             padding: const EdgeInsets.only(top: 8.0),
 
@@ -175,126 +189,18 @@ class AccountInfoScreen extends StatelessWidget {
   }
 }
 
-class ChangePasswordScreen extends StatefulWidget {
-  const ChangePasswordScreen({super.key});
 
-  @override
-  _ChangePasswordScreenState createState() => _ChangePasswordScreenState();
-}
-
-class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  final TextEditingController _currentPasswordController = TextEditingController();
-  final TextEditingController _newPasswordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Alterar a Senha'),
-        centerTitle: true,
-        flexibleSpace: Center(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 8.0),
-
-          ),
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _currentPasswordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Senha Atual'),
-            ),
-            TextField(
-              controller: _newPasswordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Nova Senha'),
-            ),
-            TextField(
-              controller: _confirmPasswordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Confirmar Nova Senha'),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                _changePassword(context);
-              },
-              child: const Text('Alterar Senha'),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ForgotPasswordScreen()),
-                );
-              },
-              child: const Text('Esqueceu a Senha?'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _changePassword(BuildContext context) {
-
-    String currentPassword = _currentPasswordController.text;
-    String newPassword = _newPasswordController.text;
-    String confirmPassword = _confirmPasswordController.text;
-
-    if (currentPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, preencha todos os campos.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    if (newPassword != confirmPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('As novas senhas não coincidem.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Senha alterada com sucesso!'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
-}
-
-class ForgotPasswordScreen extends StatelessWidget {
+class ResetPasswordScreen extends StatelessWidget {
   final TextEditingController _emailController = TextEditingController();
 
-  ForgotPasswordScreen({super.key});
+  ResetPasswordScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Esqueceu a Senha'),
+        title: const Text('Redefinir Senha'),
         centerTitle: true,
-        flexibleSpace: Center(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 8.0),
-
-          ),
-        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -304,13 +210,18 @@ class ForgotPasswordScreen extends StatelessWidget {
             TextField(
               controller: _emailController,
               decoration: const InputDecoration(labelText: 'Email Cadastrado'),
+              keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                _sendPasswordRecoveryEmail(context);
+                _sendPasswordResetEmail(context);
               },
-              child: const Text('Enviar Email de Recuperação de Senha'),
+              style: ButtonStyle(
+                backgroundColor: MaterialStateProperty.all<Color>(Colors.black),
+                foregroundColor: MaterialStateProperty.all<Color>(Colors.white),
+              ),
+              child: const Text('Redefinir Senha'),
             ),
           ],
         ),
@@ -318,25 +229,44 @@ class ForgotPasswordScreen extends StatelessWidget {
     );
   }
 
-  void _sendPasswordRecoveryEmail(BuildContext context) {
+  void _sendPasswordResetEmail(BuildContext context) async {
+    String userEmail = _emailController.text.trim();
 
-    String userEmail = _emailController.text;
-
-    if (userEmail.isEmpty || !userEmail.contains('@puccampinas.edu.br')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, insira um email válido.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    if (userEmail.isEmpty || !isValidEmail(userEmail)) {
+      _showErrorSnackbar(context, 'Por favor, insira um email válido.');
       return;
     }
 
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: userEmail);
 
+      _showSuccessSnackbar(
+          context, 'Email de redefinição enviado para $userEmail.');
+    } catch (e) {
+      _showErrorSnackbar(
+          context, 'Erro ao enviar o email de redefinição de senha.');
+    }
+  }
+
+  bool isValidEmail(String email) {
+    return RegExp(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
+        .hasMatch(email);
+  }
+
+  void _showSuccessSnackbar(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Email de recuperação enviado para $userEmail.'),
+        content: Text(message),
         backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _showErrorSnackbar(BuildContext context, String errorMessage) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(errorMessage),
+        backgroundColor: Colors.red,
       ),
     );
   }
@@ -358,7 +288,7 @@ class DevelopersScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildDeveloperItem(context, 'Davi Silveira Okida', 'https://github.com/Davi-SO'),
-            _buildDeveloperItem(context, 'Igor Siqueira Massaro', 'https://github.com/dev2'),
+            _buildDeveloperItem(context, 'Igor Siqueira Massaro', 'https://github.com/IMassaror'),
             _buildDeveloperItem(context, 'João Vitor Gomide Campos', 'https://github.com/JvGomide'),
             _buildDeveloperItem(context, 'Pedro Alberto Falqueiro Giorgiano', 'https://github.com/Pedro-Giorgiano'),
             _buildDeveloperItem(context, 'Rafael Loureiro Melare', 'https://github.com/RafaelMelare'),
@@ -671,12 +601,75 @@ class PrivacyPolicyScreen extends StatelessWidget {
     );
   }
 
+
+
   Widget _buildBoldText(String text, {double fontSize = 16}) {
     return Text(
       text,
       style: TextStyle(
         fontWeight: FontWeight.bold,
         fontSize: fontSize,
+      ),
+    );
+  }
+}
+
+class DeleteAccountScreen extends StatefulWidget {
+  const DeleteAccountScreen({Key? key}) : super(key: key);
+
+  @override
+  _DeleteAccountScreenState createState() => _DeleteAccountScreenState();
+}
+
+class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  Future<void> _deleteAccount() async {
+    try {
+      //deleta  conta
+      await FirebaseAuth.instance.currentUser?.delete();
+
+
+      Navigator.pushReplacementNamed(context, '/login');
+    } catch (e) {
+      print('Erro ao deletar conta: $e');
+
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Deletar Conta'),
+        centerTitle: true,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _emailController,
+              decoration: InputDecoration(labelText: 'Email Atual'),
+            ),
+            TextField(
+              controller: _passwordController,
+              obscureText: true,
+              decoration: InputDecoration(labelText: 'Senha Atual'),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _deleteAccount,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+              ),
+              child: Text('Deletar Conta'),
+            ),
+          ],
+        ),
       ),
     );
   }
